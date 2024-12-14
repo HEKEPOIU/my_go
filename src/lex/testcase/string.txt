@@ -1,3 +1,7 @@
 "abc"
 "hello,world"
 "中文\n"
+`\n
+\n` 
+`abc
+    123` 

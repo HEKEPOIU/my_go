@@ -4,6 +4,6 @@ import "fmt"
 
 /**/
 func main() {
-    x := '\b';
-    fmt.Printf("hello, world \n")
+    x := "a\tc";
+    fmt.Printf(x)
 }

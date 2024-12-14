@@ -7,9 +7,12 @@ use logos::{Lexer, Logos};
 #[logos(subpattern punctuation = r#"\p{P}&&[^"]&&[^']"#)] // Any unicode letter or _
 #[logos(subpattern decimal_digit = r"[0-9]")]
 #[logos(subpattern decimal_digits = r"(?&decimal_digit)(?:_?)(?&decimal_digit)*")]
-#[logos(subpattern escaped_char = r#"\\[nrtvfab\'\"]"#)]
+#[logos(subpattern escaped_char_raw = r#"\\[nrtvfab\'\"]"#)]
+#[logos(subpattern escaped_char = r"\s")]
 // Note That \b not support by rust(?, so use character code(\x08) instand.
-#[logos(subpattern unicode_value  = r"[(?&letter)(?&escaped_char)(?&decimal_digit)(?&punctuation)]")]
+#[logos(subpattern unicode_value  = r"[(?&letter)(?&escaped_char_raw)(?&escaped_char)(?&decimal_digit)(?&punctuation)]")]
+#[logos(subpattern interpreted_string_lit = r#""(?&unicode_value)*""#)]
+#[logos(subpattern raw_string_lit = r"`((?&unicode_value)|\n)*`")]
 pub enum MyGoToken {
     #[regex(r"//.*\n?", logos::skip)] // Single Line Comment
     #[regex(r"/\*([^*]|\*+[^*/])*\*+/", logos::skip)] // Multi Line Comment
@@ -24,16 +27,19 @@ pub enum MyGoToken {
     #[regex("(?&decimal_digits)", |lex| lex.slice().replace('_',"").parse::<PlatformInt>().unwrap())]
     Integer(PlatformInt),
 
-    #[regex("\'((?&letter)|(?&escaped_char)|(?&decimal_digit)|(?&punctuation))\'", parse_rune)]
+    #[regex(
+        "\'((?&letter)|(?&escaped_char_raw)|(?&decimal_digit)|(?&punctuation))\'",
+        parse_rune
+    )]
     Rune(char),
 
-    #[regex("\"(?&unicode_value)*\"", |lex| lex.slice().replace("\"","").to_owned())]
+    #[regex("((?&interpreted_string_lit)|(?&raw_string_lit))", |lex| lex.slice()[1..lex.slice().len() - 1].to_string())]
     String(String),
 }
 
 fn parse_rune(lex: &mut Lexer<MyGoToken>) -> Result<char, MyGOError> {
-    let char = lex.slice().replace('\'', "");
-    match char.as_str() {
+    let char = &lex.slice()[1..lex.slice().len() - 1];
+    match char {
         r"\n" => Ok('\n'),
         r"\r" => Ok('\r'),
         r"\t" => Ok('\t'),
@@ -45,8 +51,8 @@ fn parse_rune(lex: &mut Lexer<MyGoToken>) -> Result<char, MyGOError> {
         r#"\""# => Ok('\"'),
         r"\b" => Ok('\x08'),
         c if char.chars().count() == 1 => Ok(c.parse().unwrap()),
-        _ => Err(MyGOError::InvalidRune) // shouldn't happen, because if not match above, it won't
-                                         // get into here.
+        _ => Err(MyGOError::InvalidRune), // shouldn't happen, because if not match above, it won't
+                                          // get into here.
     }
 }
 
@@ -56,8 +62,6 @@ pub enum MyGOError {
     #[default]
     UnKnownToken,
 }
-
-
 
 #[cfg(target_pointer_width = "32")]
 type PlatformInt = i32;
@@ -113,8 +117,8 @@ mod tests {
 
     #[test]
     fn test_lexer_rune() {
-        let mut input_f =
-            read_file_to_string("src/lex/testcase/rune.txt").expect("Failed to read file");
+        let input_f =
+            read_file_to_string_helper("src/lex/testcase/rune.txt").expect("Failed to read file");
 
         let mut lex = MyGoToken::lexer(&input_f);
 
@@ -130,7 +134,7 @@ mod tests {
         assert_eq!(lex.next(), Some(Err(MyGOError::UnKnownToken)));
     }
 
-    fn read_file_to_string(filename: &str) -> io::Result<String> {
+    fn read_file_to_string_helper(filename: &str) -> io::Result<String> {
         let mut file = File::open(filename)?;
         let mut content = String::new();
         file.read_to_string(&mut content)?;
@@ -140,7 +144,7 @@ mod tests {
     #[test]
     fn test_lexer_string_from_file() {
         let input =
-            read_file_to_string("src/lex/testcase/string.txt").expect("Failed to read file");
+            read_file_to_string_helper("src/lex/testcase/string.txt").expect("Failed to read file");
 
         let mut lex = MyGoToken::lexer(&input);
 
@@ -152,6 +156,16 @@ mod tests {
         assert_eq!(
             lex.next(),
             Some(Ok(MyGoToken::String(r"中文\n".to_string())))
+        );
+
+        assert_eq!(
+            lex.next(),
+            Some(Ok(MyGoToken::String("\\n\n\\n".to_string())))
+        );
+
+        assert_eq!(
+            lex.next(),
+            Some(Ok(MyGoToken::String("abc\n    123".to_string())))
         );
     }
 }
