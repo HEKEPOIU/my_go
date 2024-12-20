@@ -1,6 +1,6 @@
 use logos::{Lexer, Skip};
 
-use super::{ MyGOError, MyGoToken, ParseData, ParsePos, PlatformInt};
+use super::{MyGOError, MyGoToken, ParseData, ParsePos, PlatformInt};
 
 pub fn parse_rune(lex: &mut Lexer<MyGoToken>) -> Result<ParseData<char>, MyGOError> {
     let char = &lex.slice()[1..lex.slice().len() - 1];
@@ -71,10 +71,15 @@ fn get_parse_loc(lex: &Lexer<MyGoToken>) -> ParsePos {
     (line, column)
 }
 
-
-
 pub fn newline_parse(lex: &mut Lexer<MyGoToken>) -> Skip {
     lex.extras.0 += 1;
     lex.extras.1 = lex.span().end;
     Skip
+}
+
+pub fn none_data_parse(lex: &mut Lexer<MyGoToken>) -> ParseData<()> {
+    ParseData {
+        data: (),
+        loc: get_parse_loc(lex),
+    }
 }

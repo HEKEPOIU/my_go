@@ -1,0 +1,6 @@
+var
+if
+else
+for
+const
+func
