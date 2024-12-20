@@ -1,4 +1,9 @@
-use logos::{Lexer, Logos, Skip};
+use logos::Logos;
+
+mod parse_token;
+use parse_token::{
+    newline_parse, parse_float, parse_identifier, parse_interger, parse_rune, parse_string,
+};
 
 #[derive(Logos, Debug, PartialEq)]
 #[logos(error = MyGOError)]
@@ -15,7 +20,7 @@ use logos::{Lexer, Logos, Skip};
 #[logos(subpattern interpreted_string_lit = r#""(?&unicode_value)*""#)]
 #[logos(subpattern raw_string_lit = r"`((?&unicode_value)|\n)*`")]
 pub enum MyGoToken {
-    #[regex(r"\n", newline_callback)]
+    #[regex(r"\n", newline_parse)]
     Newline,
     #[regex(r"//.*\n?", logos::skip)] // Single Line Comment
     #[regex(r"/\*([^*]|\*+[^*/])*\*+/", logos::skip)] // Multi Line Comment
@@ -40,87 +45,14 @@ pub enum MyGoToken {
     String(ParseData<String>),
 }
 
-type ParsePos = (usize, usize);
+type ParsePos = (Line, Column);
+type Line = usize;
+type Column = usize;
 
 #[derive(Debug, PartialEq)]
-pub struct ParseData<T> {
+pub struct ParseData<T = ()> {
     loc: ParsePos,
     data: T,
-}
-
-fn get_parse_loc(lex: &Lexer<MyGoToken>) -> ParsePos {
-    let line = lex.extras.0;
-    let column = lex.span().start - lex.extras.1;
-    (line, column)
-}
-
-fn parse_rune(lex: &mut Lexer<MyGoToken>) -> Result<ParseData<char>, MyGOError> {
-    let char = &lex.slice()[1..lex.slice().len() - 1];
-    let data = match char {
-        r"\n" => Ok('\n'),
-        r"\r" => Ok('\r'),
-        r"\t" => Ok('\t'),
-        r"\v" => Ok('\x0B'),
-        r"\f" => Ok('\x0C'),
-        r"\a" => Ok('\x07'),
-        r"\\\\" => Ok('\\'),
-        r"\'" => Ok('\''),
-        r#"\""# => Ok('\"'),
-        r"\b" => Ok('\x08'),
-        c if char.chars().count() == 1 => Ok(c.parse().unwrap()),
-        _ => Err(MyGOError::InvalidRune), // shouldn't happen, because if not match above, it won't
-                                          // get into here.
-    }?;
-    Ok(ParseData {
-        data,
-        loc: get_parse_loc(lex),
-    })
-}
-
-fn parse_string(lex: &mut Lexer<MyGoToken>) -> ParseData<String> {
-    let data = lex.slice()[1..lex.slice().len() - 1].to_string();
-    ParseData {
-        data,
-        loc: get_parse_loc(lex),
-    }
-}
-
-fn parse_identifier(lex: &mut Lexer<MyGoToken>) -> ParseData<String> {
-    let data = lex.slice().to_string();
-    ParseData {
-        data,
-        loc: get_parse_loc(lex),
-    }
-}
-
-fn parse_interger(lex: &mut Lexer<MyGoToken>) -> Result<ParseData<PlatformInt>, MyGOError> {
-    let data = lex
-        .slice()
-        .replace('_', "")
-        .parse::<PlatformInt>()
-        .map_err(|_| MyGOError::InvalidInterger)?;
-    Ok(ParseData {
-        data,
-        loc: get_parse_loc(lex),
-    })
-}
-
-fn parse_float(lex: &mut Lexer<MyGoToken>) -> Result<ParseData<f64>, MyGOError> {
-    let data = lex
-        .slice()
-        .replace('_', "")
-        .parse::<f64>()
-        .map_err(|_| MyGOError::Invalidfloat)?;
-    Ok(ParseData {
-        data,
-        loc: get_parse_loc(lex),
-    })
-}
-
-fn newline_callback(lex: &mut Lexer<MyGoToken>) -> Skip {
-    lex.extras.0 += 1;
-    lex.extras.1 = lex.span().end;
-    Skip
 }
 
 #[derive(Default, Debug, Clone, PartialEq)]
