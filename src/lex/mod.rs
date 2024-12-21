@@ -63,12 +63,17 @@ pub enum MyGoToken {
     #[regex("func", none_data_parse)]
     TFunc(ParseData<()>),
 
+    #[regex("package", none_data_parse)]
+    TPackage(ParseData<()>),
+
+    #[regex("import", none_data_parse)]
+    TImport(ParseData<()>),
+
     #[regex("=", none_data_parse)]
     TEq(ParseData<()>),
 
     #[regex(":=", none_data_parse)]
     TShortDecl(ParseData<()>),
-
 
     #[regex("<", none_data_parse)]
     TLess(ParseData<()>),
@@ -175,6 +180,7 @@ pub enum MyGoToken {
 
     #[regex(r"\.", none_data_parse )]
     TDot(ParseData<()>),
+
 }
 
 type ParsePos = (Line, Column);
@@ -374,6 +380,8 @@ mod tests {
         assert_eq!(lex.next(), Some(Ok(MyGoToken::TFor(ParseData{data:(),loc:(3,0)}))));
         assert_eq!(lex.next(), Some(Ok(MyGoToken::TConst(ParseData{data:(),loc:(4,0)}))));
         assert_eq!(lex.next(), Some(Ok(MyGoToken::TFunc(ParseData{data:(),loc:(5,0)}))));
+        assert_eq!(lex.next(), Some(Ok(MyGoToken::TPackage(ParseData{data:(),loc:(6,0)}))));
+        assert_eq!(lex.next(), Some(Ok(MyGoToken::TImport(ParseData{data:(),loc:(7,0)}))));
     }
 
     #[test]
@@ -465,5 +473,32 @@ mod tests {
                 loc: (4, 0)
             })))
         );
+    }
+
+    #[test]
+    fn test_lexer_form_go(){
+    
+        let input =
+            read_file_to_string_helper("src/lex/testcase/go/helloworld.go").expect("Failed to read file");
+
+        let mut lex = MyGoToken::lexer(&input);
+
+        assert_eq!(lex.next(), Some(Ok(MyGoToken::TPackage(ParseData{data:(), loc:(0,0)}))));
+        assert_eq!(lex.next(), Some(Ok(MyGoToken::Identifier(ParseData{data:"main".to_string(), loc:(0,8)}))));
+        assert_eq!(lex.next(), Some(Ok(MyGoToken::TImport(ParseData{data:(), loc:(2,0)}))));
+        assert_eq!(lex.next(), Some(Ok(MyGoToken::String(ParseData{data:"fmt".to_string(), loc:(2,7)}))));
+        assert_eq!(lex.next(), Some(Ok(MyGoToken::TFunc(ParseData{data:(), loc:(5,0)}))));
+        assert_eq!(lex.next(), Some(Ok(MyGoToken::Identifier(ParseData{data:"main".to_string(), loc:(5,5)}))));
+        assert_eq!(lex.next(), Some(Ok(MyGoToken::TLRBrack(ParseData{data:(), loc:(5,9)}))));
+        assert_eq!(lex.next(), Some(Ok(MyGoToken::TRRBrack(ParseData{data:(), loc:(5,10)}))));
+        assert_eq!(lex.next(), Some(Ok(MyGoToken::TLCBrack(ParseData{data:(), loc:(5,12)}))));
+        assert_eq!(lex.next(), Some(Ok(MyGoToken::Identifier(ParseData{data:"fmt".to_string(), loc:(6,4)}))));
+        assert_eq!(lex.next(), Some(Ok(MyGoToken::TDot(ParseData{data:(), loc:(6,7)}))));
+        assert_eq!(lex.next(), Some(Ok(MyGoToken::Identifier(ParseData{data:"Printf".to_string(), loc:(6,8)}))));
+        assert_eq!(lex.next(), Some(Ok(MyGoToken::TLRBrack(ParseData{data:(), loc:(6,14)}))));
+        assert_eq!(lex.next(), Some(Ok(MyGoToken::String(ParseData{data:"hello, world".to_string(), loc:(6,15)}))));
+        assert_eq!(lex.next(), Some(Ok(MyGoToken::TRRBrack(ParseData{data:(), loc:(6,29)}))));
+        assert_eq!(lex.next(), Some(Ok(MyGoToken::TSemi(ParseData{data:(), loc:(6,30)}))));
+        assert_eq!(lex.next(), Some(Ok(MyGoToken::TRCBrack(ParseData{data:(), loc:(7,0)}))));
     }
 }

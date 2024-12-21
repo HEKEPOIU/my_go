@@ -4,3 +4,5 @@ else
 for
 const
 func
+package
+import
